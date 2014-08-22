@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ -z "$1" ] || [ ! -z "$2" ]; then 
+    echo "many requires exactly one argument"
+    exit 255
+fi
+
+stdin=`cat`
+
+if stdout=`$1 <<< "$stdin"`; then
+    "$0" "$1" <<< "$stdout"
+else
+    cat <<< "$stdin"
+fi

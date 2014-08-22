@@ -1,0 +1,18 @@
+#!/bin/bash
+
+replace "$1" "$1"
+
+#if [ -z "$1" ] || [ ! -z "$2" ]; then 
+    #echo "match requires exactly one argument"
+    #exit 255
+#fi
+#
+#IFS=
+#read -n "${#1}" in
+#
+#if [ "$1" = "$in" ]; then
+    #printf "$in" 1>&2
+    #cat
+    #exit 0
+#fi
+#exit 1

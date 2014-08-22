@@ -1,0 +1,8 @@
+#!/bin/bash
+
+stdin=`cat`
+
+for cmd in "$@"; do
+    eval "$cmd <<< \"$stdin\"" && exit 0
+done
+exit 1

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ -z "$1" ] || [ -z "$2" ] || [ ! -z "$3" ]; then 
+    echo "replace requires exactly two argument"
+    exit 255
+fi
+
+IFS=
+read -n "${#1}" in
+
+if [ "$1" = "$in" ]; then
+    printf "$2" 1>&2
+    cat
+    exit 0
+fi
+exit 1

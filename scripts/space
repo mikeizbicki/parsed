@@ -1,0 +1,6 @@
+#!/bin/bash
+
+tab=`echo -e "\t"`
+newline=`echo -e "\n"`
+
+or "match \" \"" "match \"$tab\"" "match \"$newline\""
