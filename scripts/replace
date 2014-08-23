@@ -1,16 +1,19 @@
 #!/bin/bash
 
 if [ -z "$1" ] || [ -z "$2" ] || [ ! -z "$3" ]; then 
-    echo "replace requires exactly two argument"
+    echo "replace requires exactly two arguments"
     exit 255
 fi
 
 IFS=
-read -n "${#1}" in
+#read -n "${#1}" in
 
-if [ "$1" = "$in" ]; then
-    printf "$2" 1>&2
-    cat
+stdin=`cat`
+stdout=`eval "$1" <<< "$stdin" 2>/dev/null `
+
+if [ 0 -eq $? ]; then
+    echo -n "$2" 1>&2
+    echo -n "$stdout"
     exit 0
 fi
 exit 1

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ -z "$1" ] || [ ! -z "$2" ]; then 
+    echo "satisfy requires exactly one argument"
+    exit 255
+fi
+
+IFS=
+read -rn 1 in
+
+#echo "in=[$in]"
+in=$(echo $in | sed -e "s/\\\\/\\\\\\\\/g" | sed -e "s/\"/\\\\\"/g")
+#echo "in=[$in]"
+
+if eval "$1 \"$in\""; then
+    echo -n "$in" 1>&2
+    cat
+    exit 0
+fi
+exit 1

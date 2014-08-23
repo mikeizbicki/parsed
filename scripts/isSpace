@@ -1,0 +1,11 @@
+#!/bin/bash
+
+t=$(echo -e '\t')
+n=$(echo -e '\n')
+r=$(echo -e '\r')
+
+if [ ! -z "$1" ]; then
+    [ "$1" = " " ] || [ "$1" = "$t" ] || [ "$1" = "$n" ] || [ "$1" = "$r" ]
+else
+    exit 1
+fi

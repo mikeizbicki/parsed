@@ -7,8 +7,10 @@ fi
 
 stdin=`cat`
 
-if stdout=`$1 <<< "$stdin"`; then
+if [ ! -z "$stdin" ] && stdout=`eval "$1" <<< "$stdin"`; then
+    #echo "stdout=[$stdout]" >&2
     "$0" "$1" <<< "$stdout"
 else
+    #echo "else" >&2
     cat <<< "$stdin"
 fi

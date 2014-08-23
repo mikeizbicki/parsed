@@ -1,0 +1,7 @@
+#!/bin/bash
+
+stdout=$(replace spaces " " | many notSpace)
+
+if [ ! -z "$stdout" ]; then
+    rmSpaces <<< "$stdout"
+fi

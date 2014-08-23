@@ -1,0 +1,3 @@
+#!/bin/bash
+
+between "match \(" "match \)" "$1"

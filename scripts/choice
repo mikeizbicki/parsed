@@ -1,0 +1,9 @@
+#!/bin/bash
+
+stdin=`cat`
+
+for cmd in "$@"; do
+    #echo "cmd=[$cmd]" >&2
+    stdout=$(eval "echo \"$stdin\" | $cmd") && echo -n "$stdout" && exit 0
+done
+exit 1

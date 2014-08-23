@@ -1,0 +1,14 @@
+#!/bin/bash
+
+language="rmSpaces"
+
+#parsed=$(parsec "$language" <<< "$1" 2>&1 > /dev/null)
+parsed=$(parsec rmSpaces <<< "$1" 2>&1 > /dev/null)
+ret=$?
+
+echo "parsed=[$parsed]"
+echo "stderr=[$stderr]" 
+echo
+echo "$ret"
+
+exit $ret
