@@ -1,0 +1,11 @@
+#!/bin/bash
+
+IFS=
+read -n 1 next
+
+if [ -z $next ]; then
+    exit 0
+else
+    cat
+    exit 1
+fi

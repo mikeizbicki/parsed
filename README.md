@@ -1,4 +1,27 @@
-bourne-again-parsec
-===================
+# msed
 
-a simple parser combinator library for the bash shell based on the monadic parsec library
+this correctly parses:
+
+```
+msed2 "
+
+many ( spaces | choice (match a) 
+                       (match test) 
+                       (match is) 
+                       (match this)
+    ) 
+| eof" <<< "this is a test"
+```
+
+and this correctly fails to parse:
+
+```
+msed2 "
+
+many ( spaces | choice (match a) 
+                       (match test) 
+                       (match is) 
+                       (match this)
+    ) 
+| eof" <<< "this is NOT a test"
+```
