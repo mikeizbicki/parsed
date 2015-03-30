@@ -1,7 +1,0 @@
-#!/bin/bash
-
-#echo "balancedParen" >&2
-
-choice "parens \"spaces | balancedParen | spaces\"" spaces
-#choice "between \"match \(\" \"match \)\" \"spaces | balancedParen | spaces\"" spaces
-#choice "match \( | balancedParen | match \)" spaces
