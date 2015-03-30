@@ -1,0 +1,621 @@
+%\documentclass[conference]{IEEEtran}
+\documentclass{sigplanconf}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{ulem,url,algorithm,courier}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\lstset{ %
+  %backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+  basicstyle=\footnotesize\ttfamily,        % the size of the fonts that are used for the code
+  %breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+  breaklines=true,                 % sets automatic line breaking
+  %captionpos=b,                    % sets the caption-position to bottom
+  %commentstyle=\color{green},    % comment style
+  %deletekeywords={...},            % if you want to delete keywords from the given language
+  %escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+  %extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+  %frame=single,                    % adds a frame around the code
+  keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+  %keywordstyle=\color{blue},       % keyword style
+  language=bash,                 % the language of the code
+  morekeywords={$,$?,?,some,git,clone,many,choice,eof,match,...},            % if you want to add more keywords to the set
+  %numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+  %numbersep=5pt,                   % how far the line-numbers are from the code
+  %numberstyle=\tiny\color{gray}, % the style that is used for the line-numbers
+  %rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+  %showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+  showstringspaces=true,          % underline spaces within strings only
+  %showtabs=false,                  % show tabs within strings adding particular underscores
+  %stepnumber=2,                    % the step between two line-numbers. If it's 1, each line will be numbered
+  %stringstyle=\color{blue},       % string literal style
+  %tabsize=2,                       % sets default tabsize to 2 spaces
+  %title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+}
+
+\renewcommand{\emph}[1]{{\textit{#1}}}
+
+\newcommand{\parsed}{{\ttfamily parsed}~}
+\newcommand{\sed}{{\ttfamily sed}~}
+\newcommand{\PATH}{{\ttfamily PATH}~}
+\newcommand{\sh}[1]{{\ttfamily {#1}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+\special{papersize=8.5in,11in}
+\setlength{\pdfpageheight}{\paperheight}
+\setlength{\pdfpagewidth}{\paperwidth}
+
+\conferenceinfo{CONF 'yy}{Month d--d, 20yy, City, ST, Country}
+\copyrightyear{20yy}
+\copyrightdata{978-1-nnnn-nnnn-n/yy/mm}
+\doi{nnnnnnn.nnnnnnn}
+
+\title{Bashing Haskell: \\Reimplementing the Parsec Library Inside the Unix Shell}
+\subtitle{\sout{Functional} Imperative Pearl}
+\authorinfo
+    {Mike Izbicki}
+    {University of California Riverside}
+    {mike@izbicki.me}
+
+\maketitle
+
+\begin{abstract}
+We introduce the Parsed suite of Unix command line tools.
+Parsed improves the classic sed program by incorporating ideas from the popular \sh{parsec} Haskell library.
+In particular, the Unix pipe operator \sh{(|)} corresponds exactly to Haskell's Applicative bind \sh{(*>)}.
+The resulting syntax is both intuitive and powerful.
+The original syntax used by sed can match only regular languages;
+but our improved syntax can match any context sensitive language.
+%The \parsed tool is written entirely in POSIX compatible shell scripts.
+\end{abstract}
+
+%\category{CR-number}{subcategory}{third-level}
+%\terms
+%term1, term2
+\keywords unix, sed, parsing, parsec, Haskell, applicative, monad
+
+\section{Introduction}
+
+The stream editor (sed) is one of the oldest and most widely used Unix utilities.
+Unfortunately, it is a monolithic beast.
+It fails to live up to the Unix philosophy of ``do one thing well.''
+The problem is that sed tries to implement all regular expression features in a single executable.
+This ruins composibility.
+For example, let's say I have a simple sed command for deleting email addresses.
+Something like:
+\begin{lstlisting}
+sed 's/[a-zA-Z0-9.]@[a-zA-Z0-9.]/xxx@xxx/g'
+\end{lstlisting}
+But in the file I'm working on, I only want to delete an email address if the line starts with the words \sh{CONFIDENTIAL}.
+This should not be a hard task.
+We \emph{should} be able to write another sed command for finding lines that begin with \sh{CONFIDENTIAL},
+then combine these two commands.
+But this is not possible using standard techniques.
+To solve our problem, we must rewrite an entirely new sed command from scratch.
+Within that command, we copy-and-paste our previously tested command:
+\begin{lstlisting}
+sed 's/(CONFIDENTIAL.*)[a-zA-Z0-9.]@[a-zA-Z0-9.]/$1xxx@xxx/g'
+\end{lstlisting}
+Real world experience suggests that this practice is a leading source of bugs for the modern sed programmer.\footnote{Can you spot the bug in the above command?}
+In this paper, we simplify shell based parsing by introducing techniques from functional programming into the Unix shell.
+Our Parsed library combines the best of sed with Haskell's excellent Parsec library.
+
+%Functional programming and Unix shell scripting share a surprising amount in common.
+%The classic Unix principle that programs should do one thing well.
+%Parsec \cite{leijen2002} is an amazing tool.
+%Functional programming languages excel at parsing.
+%Parser combinator libraries are amazing, and Parsec \cite{leijen2002} is perhaps the most famous example.
+Parsec is a simple Haskell library that makes parsing easy and fun.
+It provides a small set of simple higher order functions called combinators.
+By combining these combinators, we can create programs capable of parsing complex grammars.
+The Parsed library recreates these combinators within the Unix terminal.
+In particular, each combinator corresponds to either a shell script or shell function.
+We then combine these combinators using the standard Unix pipe.
+There are three combinators of particular importance: \sh{match}, \sh{some}, and \sh{choice}.
+With these combinators, we can match any regular expression.
+But unlike sed, our combinators can take advantage of the shell's built-in expressivity to match any context sensitive language!
+
+%It is a prime example of a class of libraries called parser combinators.
+%These libraries give the programmer a small set of higher order functions called combinators.
+%These functions get their name from the easy with with they can be combined together.
+%Thus, it is easy to build complex parsers from a modest foundation.
+%These tools use the power of functional programming to make
+
+%I'll be teaching a class on bash scripting this fall.
+%I needed to review my scripting skilz, so I embarked on a summer project.
+%Since I normally program in Haskell, an applicative parser seemed like just the thing.
+%The result is the Applicative Stream EDitor (`parsed`).
+%Every combinator in the library is a bash script, and the Unix pipe operator `|` gives us the applicative structure.
+%`parsed` can recognize context sensitive languages (`sed` can only recognize regular languages) and gives us a much nicer syntax inspired by Haskell's amazing [parsec library](http://hackage.haskell.org/package/parsec).
+%And it's all written in pure, glorious, mindbending bash script.
+
+%Unlike \sed, \parsed is not a single monolithic program.
+%\parsed is a suite of small programs called combinators.
+%These combinators get combined together using the standard Unix pipe to create complex parsers.
+
+In the remainder of this paper, we give a brief tutorial on how to construct your own parsers using Parsed.
+We recommend that you install Parsed and follow along with our examples.
+Installing is easy.
+Just clone the git repo:
+\begin{lstlisting}
+$ git clone https://github.com/mikeizbicki/parsed
+\end{lstlisting}
+And add the resulting \sh{parsed/scripts} folder to your \sh{PATH}:
+\begin{lstlisting}
+$ export PATH="$(pwd)/parsed/scripts:$PATH"
+\end{lstlisting}
+That's it!
+You're now ready to start parsing!
+
+\section{Matching strings}
+\label{sec:match}
+
+The most basic combinator is \sh{match}.
+It's easiest to see how it works by example.
+Throughout this tutorial, we will first present the examples, and then their explanation.
+\begin{lstlisting}
+$ match hello <<< "goodbye"
+$ echo $?
+1
+\end{lstlisting}
+\sh{match} takes a single command line argument, which is the string our parser is trying to match.
+In the above example, this is the string \sh{hello}.
+The text to be parsed comes from stdin.
+In the above example, we use bash's built-in \sh{<<<} syntax, which redirects the contents of the following string (\sh{goodbye}) to stdin.
+The exit code of the previously run program is stored in the shell variable \sh{\$?}.
+In the above example, our parser failed (the string \sh{hello} does not match the string \sh{goodbye}), so \sh{\$?} contains a non-zero value.
+
+Now let's see what a successful parse looks like:
+\begin{lstlisting}
+$ match hello <<< "hello"
+hello
+$ echo $?
+0
+\end{lstlisting}
+When \sh{match} succeeds, the matched text gets printed to stderr.
+This is where the output string \sh{hello} comes from in the above example.
+Since parsing succeeded, \sh{match} returned an exit code of 0.
+As you can see, \sh{match} is a very simple parser.
+It is normally combined with other parsers.
+
+\begin{algorithm}
+ \floatname{algorithm}{Script}
+\caption{\sh{match}}
+\label{alg:match}
+\begin{lstlisting}
+#!/bin/sh
+
+# check for the correct number of arguments
+if [ -z "$1" ] || [ ! -z "$2" ]; then
+    echo "match requires exactly one argument"
+    exit 255
+fi
+
+# When reading from stdin, the shell ignores the contents of the IFS variable. By default, this is set to whitespace. In order to be able to read whitespace, we must set IFS to nothing.
+IFS=''
+
+# read in exactly as some characters as are in the first command line argument
+read -rn "${#1}" in
+
+# if we parse correctly
+if [ "$1" = "$in" ]; then
+    # print the parsed string to stderr
+    echo -n "$in" 1>&2
+
+    # forward the unparsed contents of stdin
+    cat
+
+    # signal that parsing succeeded
+    exit 0
+
+else
+    # parsing failed
+    exit 1
+fi
+
+\end{lstlisting}
+\end{algorithm}
+\section{Combining parsers}
+We combine parsers using the standard unix pipe (\sh{|}).
+For example, let's create a parser that first matches the string \sh{hello} and then matches the string \sh{world}:
+\begin{lstlisting}
+$ (match hello | match world) <<< "helloworld"
+helloworld
+$ echo $?
+0
+\end{lstlisting}
+Parsing succeeds for both calls to \sh{match}, so parsing succeeds overall.
+To see how piping combines parsers, we need to take a more careful look at the \sh{match} script.
+Like all combinators in the Parsed library, \sh{match} is written in POSIX compliant shell.
+The full source code is shown in Script \ref{alg:match} above.
+
+We've already seen that when \sh{match} succeeds, the matched string is printed to stderr;
+but additionally, any unparsed text is printed to stdout.
+This is demonstrated by the following two tests:
+\begin{lstlisting}
+$ match hello <<< "helloworld" 1> /dev/null
+hello
+$ match hello <<< "helloworld" 2> /dev/null
+world
+\end{lstlisting}
+As a reminder, by putting a number in front of the output redirection operator \sh{>}, we redirect the contents of that file descriptor to the specified file.
+File descriptor 1 corresponds to stdout and 2 to stderr.
+So the first command above discards stdout; it shows only the text that was successfully parsed.
+The second command above discards stderr; it shows only the text that is sent to any subsequent parsers.
+
+It is possible for the first parser to succeed and the second to fail.
+In this case, the succeeding parsers still print their output to stderr, but parsing fails overall:
+\begin{lstlisting}
+$ (match hello | match world) <<< "hellogoodbye"
+hello
+$ echo $?
+1
+\end{lstlisting}
+
+Concatenating two \sh{match} parsers is relatively uninteresting.
+We could have just concatenated the arguments to \sh{match}!
+So now let's introduce a new combinator called \sh{eof} which matches the end of file.
+That is, \sh{eof} will succeed only if the stdin buffer has been closed because there is no more input to parse.
+The source code for \sh{eof} is much simpler than for \sh{match}, and is shown in Script \ref{alg:eof}.
+
+\begin{algorithm}[t]
+ \floatname{algorithm}{Script}
+\caption{\sh{eof}}
+\label{alg:eof}
+\begin{lstlisting}
+#!/bin/sh
+
+# Try to read a single character into the variable $next. If next is empty, we're at the end of file, so parsing succeeds.
+IFS=
+read -n 1 next
+if [ -z $next ]; then exit 0; else exit 1; fi
+
+\end{lstlisting}
+\end{algorithm}
+
+These next two examples demonstrate the effect of the \sh{eof} combinator.
+First, we try matching the string \sh{hello} on the input \sh{hellohello}:
+\begin{lstlisting}
+$ match hello <<< "hellohello"
+hellohello
+$ echo $?
+0
+\end{lstlisting}
+Parsing succeeds;
+we print the contents of the parsed text (\sh{hello}) to stderr;
+and we print the remaining content to be parsed (\sh{hello}) to stdout.
+If, however, we apply the \sh{eof} combinator:
+\begin{lstlisting}
+$ (match hello | eof) <<< "hellohello"
+hello
+$ echo $?
+1
+\end{lstlisting}
+Parsing now fails because the input was too long.
+Shortening the input again causes parsing to succeed:
+\begin{lstlisting}
+$ (match hello | eof) <<< "hello"
+hello
+$ echo $?
+0
+\end{lstlisting}
+Now that we know how to combine two simple parsers, we're ready for some more complex parsers.
+
+\section{Iterating \sh{some} parsers}
+
+The \sh{some} combinator lets us apply a parser zero or more times.
+%It is the first step towards making \parsed powerful.
+\sh{some} corresponds to the Kleene star (\sh{*}) operator used in \sh{sed} and most other regular expression tools.
+\sh{some} takes a single command line argument, which is the parser we will be applying zero or more times.
+For example:
+\begin{lstlisting}
+$ (some "match hello" | eof) <<< "hellohello"
+hellohello
+$ echo $?
+0
+\end{lstlisting}
+The above example succeeds because the \sh{some "match hello"} parser consumes \emph{both} occurrences of \sh{hello}.
+As already mentioned, \sh{some} need not consume any input:
+\begin{lstlisting}
+$ some "match hello" <<< ""
+$ echo $?
+0
+$ some "match hello" <<< "goodbye"
+$ echo $?
+0
+\end{lstlisting}
+In fact, the \sh{some} used by itself can never fail---it will always just parse the empty string.
+In order to force failures, we must concatenate \sh{some} with another parser like so:
+\begin{lstlisting}
+$ (some "match hello" | eof) <<< "goodbye"
+$ echo $?
+1
+\end{lstlisting}
+
+Unfortunately, the \sh{some} combinator breaks the ability to use POSIX pipes for concatenation as we did above.
+Consider this example:
+\begin{lstlisting}
+$ (match hello | some "match hello") <<< ""
+$ echo $?
+0
+\end{lstlisting}
+Our first \sh{match} parser failed because there was no input.
+Then we call the \sh{some} parser.
+There is still no input, so \sh{some} succeeds.
+Since \sh{some} was the last command to execute, \sh{\$?} contains its exit code which is 0.
+
+The problem is that the standard POSIX \sh{\$?} variable has the wrong behavior.
+We need a variable that will report if any of the commands in the pipe chain failed.
+There is no POSIX compliant way to do this.
+But more modern shells like bash offer a simple fix.
+The command
+\begin{lstlisting}
+$ set -o pipefail
+\end{lstlisting}
+modifies the semantics of the \sh{\$?} variable so that it contains zero only if all commands in the pipe chain succeed; otherwise, it contains the exit code of the first process to exit with non-zero status.
+This command need only be run once per \sh{bash} session.
+Thereafter, we can rerun the incorrect example above to get the correct output:
+\begin{lstlisting}
+$ (match hello | some "match hello") <<< ""
+$ echo $?
+1
+\end{lstlisting}
+The code for the \sh{some} combinator is shown in Script \ref{alg:some} above.
+\begin{algorithm}[t]
+ \floatname{algorithm}{Script}
+\caption{\sh{some}}
+\label{alg:some}
+\begin{lstlisting}
+#!/bin/sh
+
+# check for the correct number of arguments
+if [ -z "$1" ] || [ ! -z "$2" ]; then
+    echo "many requires exactly one argument"
+    exit 255
+fi
+
+# put the contents of stdin into a variable so we can check if it's empty
+stdin=$(cat)
+
+# if we still have input and parsing succeeded
+if [ ! -z "$stdin" ] && stdout=`eval "$1" <<< "$stdin"`; then
+
+    # run this parser again
+    "$0" "$1" <<< "$stdout"
+else
+
+    # stop running this parser
+    cat <<< "$stdin"
+fi
+\end{lstlisting}
+\end{algorithm}
+
+\section{Custom combinatorial explosion}
+
+Most regular expression libraries offer a primitive combinator \sh{+} that matches one or more occurrences of a previous parser.
+Parsed does not have such a primitive operator because it is easy to build it using only the \sh{|} and \sh{some} combinators.
+%One way to create a new combinator is by creating a shell function.
+We call the resulting operator \sh{many}, and we implement it by creating a bash function:
+%Here is its code:
+\begin{lstlisting}
+$ many() { $1 | some "$1"; }
+\end{lstlisting}
+Recall that the \sh{\$1} variable will contain the first parameter to the \sh{many} function.
+In this case, that parameter must be a parser.
+We can use our new combinator to simplify the examples from the previous section:
+\begin{lstlisting}
+$ many "match hello" <<< ""
+$ echo $?
+1
+$ many "match hello" <<< "hello"
+hello
+$ echo $?
+0
+\end{lstlisting}
+Unfortunately, Bash functions do not last between sessions.
+If we want something more permanent, we can create a script file instead.
+In fact, the \sh{many} combinator is so useful that it comes built-in to the Parsed library.
+You can find its source code in Script \ref{alg:many} above.
+When the script file starts, it will not inherit the settings of its parent process in the same way that our \sh{many} function did.
+Therefore, we must specifically re-setup our non-POSIX pipes at the beginning of every script that uses them.
+
+\begin{algorithm}[t]
+ \floatname{algorithm}{Script}
+\caption{\sh{many}}
+\label{alg:many}
+\begin{lstlisting}
+#!/bin/bash
+set -o pipefail
+$1 | some "$1"
+exit $?
+\end{lstlisting}
+\end{algorithm}
+
+\section{The program of choice}
+The last combintor we need for parsing regular languages is called \sh{choice}.
+The \sh{match} and \sh{many} combinators required exactly one input, but choice takes an arbitrary number of input parameters.
+Each parameter is a parser.
+For each of these parsers, \sh{choice} applies it to stdin.
+If it succeeds, then \sh{choice} returns success.
+If it fails, then \sh{choice} goes on to the next parameter.
+If all parsers fail, then \sh{choice} fails as well.
+
+Here's a simple example using just the match combinator:
+\begin{lstlisting}
+$ choice "match hello" "match hola" <<< hello
+hello
+$ echo $?
+0
+$ choice "match hello" "match hola" <<< hola
+hola
+$ echo $?
+0
+$ choice "match hello" "match hola" <<< goodbye
+$ echo $?
+1
+\end{lstlisting}
+Our parser succeeds when the input was either \sh{hello} or \sh{hola}, but fails on any other input.
+
+\begin{algorithm}
+ \floatname{algorithm}{Script}
+\caption{\sh{choice}}
+\label{alg:choice}
+\begin{lstlisting}
+#!/bin/bash
+
+# We need to store the contents of stdin explicitly to a file.  When we call one of our candidate parsers, it will consume some of the input form stdin. We need to restore that input before calling the next parser.
+stdin=$(tempfile)
+cat >"$stdin"
+
+# If stdin is empty, then we're done with recursion; parsing succeeded
+if [ ! -s "$stdin" ]; then
+    exit 0
+fi
+
+# For similar reasons, we'll need to store the output of our parsers.
+stdout=$(tempfile)
+stderr=$(tempfile)
+
+# For each parser passed in as a command line arg
+for cmd in "$@"; do
+
+    # Run the parser; if it succeeds, then pass on its results
+    if $(eval "$cmd" <"$stdin" 1>"$stdout" 2>"$stderr") ; then
+        cat "$stderr" >&2
+        cat "$stdout"
+        exit 0
+    fi
+done
+
+# All parsers failed, so we failed
+exit 1
+\end{lstlisting}
+\end{algorithm}
+
+
+\section{Free your context}
+In the intro we claimed that Parsed is strictly more powerful than sed.
+We now demonstrate this feature by parsing a context free language.\footnote{Context sensitive languages are left as an exercise to the reader.}
+Sed only supports regular expressions.
+The reason Parsed has this extra power is because we can define our own recursive parsers using standard shell syntax.
+
+To demonstrate this capability, we will write a parser that checks for balanaced parenthesis.
+First, let's define a small combinator \sh{paren} that takes a single parser as an argument and creates a parser that succeeds only when the parameter is surrounded by parentheses:
+\begin{lstlisting}
+$ paren() { match "(" | $1 | match ")"; }
+\end{lstlisting}
+And let's test it:
+\begin{lstlisting}
+$ paren "match hello" <<< "hello"
+$ echo $?
+1
+$ paren "match hello" <<< "(hello)"
+(hello)
+$ echo $?
+0
+\end{lstlisting}
+We will use \sh{paren} to write a combinator \sh{maybeparen} that accepts whether or not the parameter parser is surrounded by parenthesis.
+Here is a reasonable first attempt:
+\begin{lstlisting}
+$ maybeparen() { choice "$1" "paren $1"; }
+\end{lstlisting}
+Unfortunately, this doesn't work due to scoping issues with bash.
+When we run our command, we get an error:
+\begin{lstlisting}
+$ maybeparen "match a" <<< "(a)"
+choice: line 7: paren: command not found
+\end{lstlisting}
+We get this error because the \sh{choice} combinator is its own shell script.
+When this script gets executed, a new shell process starts with a clean set of environment variables.
+In the context of this subprocess, the \sh{paren} function we created above doesn't exist.
+
+There are two ways to solve this problem.
+The simplest is to use the following bash-specific syntax:
+\begin{lstlisting}
+$ export -f paren
+\end{lstlisting}
+This command tells the running \sh{bash} shell that any subshells it spawns should also have access to the \sh{paren} function.
+Now when we try running our previous tests:
+\begin{lstlisting}
+$ maybeparen "match a" <<< "a"
+a
+$ echo $?
+0
+$ maybeparen "match a" <<< "(a)"
+$ echo $?
+1
+\end{lstlisting}
+We still get a parse error!
+What's happening is that we actually defined the \sh{maybeparen} function incorrectly.
+Here is the correct definition:
+\begin{lstlisting}
+$ maybeparen() { choice "$1" "paren \"$1\""; }
+\end{lstlisting}
+The only difference is that the correct definition surrounds our \sh{\$1} parameter with quotation marks.
+This ensures that the entire value of the variable gets passed as a single parameter to the \sh{paren} combinator.
+Because these quotation marks are within quotation marks, they must be escaped with backslashes.
+%Debugging this parser combinator library without a type system is sure a pain!
+
+We are now ready to define a combinator \sh{parens} that matches any number of balanced parentheses.
+In order to avoid the need for a set of triply nested quotation marks, we will put the \sh{parens} combinator within a script file (instead of a function) and we will manually inline our call to the \sh{paren} combinator.
+Script \ref{alg:parens} above contains the final result.
+\begin{algorithm}[t]
+ \floatname{algorithm}{Script}
+\caption{\sh{parens}}
+\label{alg:parens}
+\begin{lstlisting}
+#!/bin/bash
+choice "$1" "match '(' |parens \"$1\" |match ')'"
+\end{lstlisting}
+\end{algorithm}
+\noindent
+And now let's test our creation:
+\begin{lstlisting}
+$ parens "match a" <<< "(((a)))"
+(((a)))
+$ echo $?
+0
+$ parens "match a" <<< "(((b)))"
+$ echo $?
+1
+$ parens "match a" <<< "(((a"
+$ echo $?
+1
+\end{lstlisting}
+We've successfully parsed a context free language :)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Discussion}
+This tutorial has provided only a very brief introduction to the capabilities of our Parsed library.
+Additional under-documented features include:
+(1) We can use shell variables to simulate Haskell's \sh{Monad} type class.
+In particular, the shell code:
+\begin{lstlisting}
+var=$(func)
+\end{lstlisting}
+is equivalent to the haskell do-notation code:
+\begin{lstlisting}
+var <- func
+\end{lstlisting}
+In fact, all shell commands can be thought of as being within the \sh{IO} monad wrapped within the \sh{ParsecT} transformer.
+This leads us to our next under-documented feature.
+(2) Arbitrary commands can be used in parsers.
+Want to punish your users when they make syntax errors?
+Just add an \sh{rm -rf *} at the appropriate place in your combinators.
+In Parsed, we are no longer confined to the limits of the Haskell type system---we can exploit bash's flexibility to literally do whatever we want!
+The Unix shell is just \emph{wonderful} like that.
+%All hail the Unix shell!
+
+%Unfortunately, my wife doesn't see the value in this line of research.
+%So I stopped working on it before
+%Not being a Unix programmer, she never had to suffer through using sed and its lack of composability.
+
+\bibliography{bib}
+\bibliographystyle{plain}
+
+\end{document}

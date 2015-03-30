@@ -1,0 +1,2 @@
+#!/bin/bash
+choice "$1" "match '(' | parens \"$1\" | match ')'"

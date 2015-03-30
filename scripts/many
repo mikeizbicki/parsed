@@ -1,0 +1,4 @@
+#!/bin/bash
+set -o pipefail
+$1 | some "$1"
+exit $?

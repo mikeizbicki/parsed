@@ -6,14 +6,16 @@ if [ -z "$1" ] || [ -z "$2" ] || [ ! -z "$3" ]; then
 fi
 
 IFS=
-#read -n "${#1}" in
 
-stdin=`cat`
-stdout=`eval "$1" <<< "$stdin" 2>/dev/null `
+stdout=$(eval "$1" 2> /dev/null)
+#stdin=$(cat)
+#stdout=$(eval "$1" <<< "$stdin" 2> /dev/null)
+#eval "$1" 2>/dev/null
 
 if [ 0 -eq $? ]; then
-    echo -n "$2" 1>&2
+    echo -n "<$2>" 1>&2
     echo -n "$stdout"
     exit 0
 fi
+
 exit 1

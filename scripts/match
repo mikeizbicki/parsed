@@ -1,19 +1,30 @@
 #!/bin/bash
 
-if [ -z "$1" ] || [ ! -z "$2" ]; then 
+# check for the correct number of arguments
+if [ -z "$1" ] || [ ! -z "$2" ]; then
     echo "match requires exactly one argument"
     exit 255
 fi
 
-IFS=
+# When reading from stdin, the shell ignores the contents of the IFS variable. By default, this is set to whitespace. In order to be able to read whitespace, we must set IFS to nothing.
+IFS=''
+
+# read in exactly as some characters as are in the first command line argument
 read -rn "${#1}" in
 
-#echo "in=[$in]" >&2
-#echo "stdout=[$stdout]" >&2
-
+# if we parse correctly
 if [ "$1" = "$in" ]; then
+    # print the parsed string to stderr
     echo -n "$in" 1>&2
+
+    # forward the unparsed contents of stdin
     cat
+
+    # signal that parsing succeeded
     exit 0
+
+else
+    # parsing failed
+    exit 1
 fi
-exit 1
+

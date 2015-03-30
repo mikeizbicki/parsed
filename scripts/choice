@@ -1,9 +1,28 @@
 #!/bin/bash
 
-stdin=`cat`
+# We need to store the contents of stdin explicitly to a file.  When we call one of our candidate parsers, it will consume some of the input form stdin. We need to restore that input before calling the next parser.
+stdin=$(tempfile)
+cat >"$stdin"
 
+# If stdin is empty, then we're done with recursion; parsing succeeded
+if [ ! -s "$stdin" ]; then
+    exit 0
+fi
+
+# For similar reasons, we'll need to store the output of our parsers.
+stdout=$(tempfile)
+stderr=$(tempfile)
+
+# For each parser passed in as a command line arg
 for cmd in "$@"; do
-    #echo "cmd=[$cmd]" >&2
-    stdout=$(eval "echo \"$stdin\" | $cmd") && echo -n "$stdout" && exit 0
+
+    # Run the parser; if it succeeds, then pass on its results
+    if $(eval "$cmd" <"$stdin" 1>"$stdout" 2>"$stderr") ; then
+        cat "$stderr" >&2
+        cat "$stdout"
+        exit 0
+    fi
 done
+
+# All parsers failed, so we failed
 exit 1

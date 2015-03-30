@@ -1,0 +1,11 @@
+#!/bin/bash
+
+function parenStatement {
+    match "(" | spaces | statement | spaces | match ")"
+}
+
+function statement {
+    choice parenStatement "parenStatement | statement"
+}
+
+statement

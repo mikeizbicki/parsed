@@ -1,16 +1,21 @@
-#!/bin/bash
+#!/bin/sh
 
-if [ -z "$1" ] || [ ! -z "$2" ]; then 
+# check for the correct number of arguments
+if [ -z "$1" ] || [ ! -z "$2" ]; then
     echo "many requires exactly one argument"
     exit 255
 fi
 
-stdin=`cat`
+# put the contents of stdin into a variable so we can check if it's empty
+stdin=$(cat)
 
+# if we still have input and parsing succeeded
 if [ ! -z "$stdin" ] && stdout=`eval "$1" <<< "$stdin"`; then
-    #echo "stdout=[$stdout]" >&2
+
+    # run this parser again
     "$0" "$1" <<< "$stdout"
 else
-    #echo "else" >&2
+
+    # stop running this parser
     cat <<< "$stdin"
 fi

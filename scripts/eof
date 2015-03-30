@@ -1,11 +1,7 @@
-#!/bin/bash
+#!/bin/sh
 
+# Try to read a single character into the variable $next. If next is empty, we're at the end of file, so parsing succeeds.
 IFS=
 read -n 1 next
+if [ -z $next ]; then exit 0; else exit 1; fi
 
-if [ -z $next ]; then
-    exit 0
-else
-    cat
-    exit 1
-fi
