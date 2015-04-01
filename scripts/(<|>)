@@ -16,8 +16,13 @@ for cmd in "$@"; do
         cat "$stderr" >&2
         cat "$stdout"
         exit 0
+
+    # Our parser failed and consumed input, so we fail
+    elif [ ! -z "$stderr" ]; then
+        exit 2
     fi
 done
 
 # All parsers failed, so we failed
 exit 1
+
