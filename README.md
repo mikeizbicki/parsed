@@ -11,4 +11,4 @@ For example, the following one liner creates a parser for matching balanced pare
 ```
 $ parens() { choice "$1" "match '(' | parens \"$1\" | match ')'"; }
 ```
-For more examples and a detailed tutorial, pleas see our [SIGBOVIK2015 paper](https://github.com/mikeizbicki/parsed/raw/master/sigbovik2015/paper.pdf).
+For more examples and a detailed tutorial, please see our [SIGBOVIK2015 paper](https://github.com/mikeizbicki/parsed/raw/master/sigbovik2015/paper.pdf).
